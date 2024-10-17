@@ -3,6 +3,7 @@ from flask import Flask, render_template_string, request
 from sudoku_constraints4x4 import constraints4x4
 from sudoku_constraints9x9 import constraints9x9
 import json
+import os
 
 app = Flask(__name__)
 
@@ -409,4 +410,5 @@ def sudoku_board(puzzle_data):
 
 # Run app on http://localhost:8080
 if __name__ == "__main__":
-    app.run(debug=True, port=8080)
+    port = int(os.environ.get("PORT", 5000))  # Default to 5000 if PORT not found
+    app.run(debug=True, host="0.0.0.0", port=port)
