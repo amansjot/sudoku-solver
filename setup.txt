@@ -1,0 +1,17 @@
+--- SETUP ---
+
+1. Download this "sudoku" folder and open a terminal at this path
+
+2. * If there is no /venv folder: *
+   Create a virtual environment by running: "python3 -m venv ./venv"
+
+3. Activate the virtual environment by running: "source ./venv/bin/activate"
+
+4. Install flask by running: "pip install flask"
+
+5. Run the solver with: "python3 sudoku-solver.py"
+
+6a. Navigate to http://localhost:8080 in your browser to view the solution for puzzle_1
+ b. Add the "board" query parameter to solve any board given a 2D list or variable, such as:
+    http://localhost:8080/?board=[[1,0,0,0],[0,2,0,0],[0,0,3,0],[0,0,0,4]]
+    http://localhost:8080/?board=puzzle_2
