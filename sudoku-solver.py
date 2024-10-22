@@ -75,6 +75,27 @@ puzzle_4x4 = [
     [0, 0, 0, 4]
 ]
 
+puzzle_9x9_blank = [
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0],
+]
+
+puzzle_4x4_blank = [
+    [0, 0, 0, 0],
+    [0, 0, 0, 0],
+    [0, 0, 0, 0],
+    [0, 0, 0, 0],
+]
+
+puzzles = [puzzle_1, puzzle_2, puzzle_3, puzzle_4, puzzle_5, puzzle_9x9_blank, puzzle_4x4, puzzle_4x4_blank]
+
 # PART 2
 
 def revise(csp, Xi, Xj):
@@ -247,7 +268,7 @@ def show_webpage():
     query = request.args.get('board', '')
     if query.startswith("puzzle_"):
         puzzle = globals().get(query) or puzzle_1
-        print(f"Showing solution for {query if globals().get(query) else 'puzzle_1'}.")
+        print(f"Showing solution for {query if globals().get(query) else "puzzle_1"}.")
     else:
         try:
             puzzle = json.loads(query)
@@ -273,21 +294,27 @@ def show_webpage():
     print("Failed values for each variable:", failed_values)
     print("Number of backtracks for each variable:", backtracks)
 
-    # Set the color of the given values to black
-    cell_colors = [[(0, 0, 0) if cell else (0, 0, 255) for cell in row] for row in puzzle]
+    if solution:
+        # Set the color of the given values to black
+        cell_colors = [[(0, 0, 0) if cell else (0, 0, 255) for cell in row] for row in puzzle]
 
-    # Add the color data to each cell in the puzzle
-    puzzle_data = [[[puzzle[i][j], cell_colors[i][j]] for j in range(size)] for i in range(size)]
+        # Add the color data to each cell in the puzzle
+        puzzle_data = [[[puzzle[i][j], cell_colors[i][j]] for j in range(size)] for i in range(size)]
 
-    # Sort the solution values into a 1D list
-    solution_vals = list(dict(sorted(solution.items())).values())
+        # Sort the solution values into a 1D list
+        solution_vals = list(dict(sorted(solution.items())).values())
 
-    # Convert it into a 2D list, then add the color data to each cell
-    solution_data = [solution_vals[i * size:(i + 1) * size] for i in range(size)]
-    colored_solution_data = [[[solution_data[i][j], cell_colors[i][j]] for j in range(size)] for i in range(size)]
+        # Convert it into a 2D list, then add the color data to each cell
+        solution_data = [solution_vals[i * size:(i + 1) * size] for i in range(size)]
+        colored_solution_data = [[[solution_data[i][j], cell_colors[i][j]] for j in range(size)] for i in range(size)]
 
-    # Display the steps and store the number of states
-    steps, num_states = show_steps(puzzle_data, progress, colored_solution_data)
+        # Display the steps and store the number of states
+        steps, num_states = show_steps(puzzle_data, progress, colored_solution_data)
+    
+    else:
+        num_states = 0
+        steps = ""
+        print("error!")
 
     # HTML code for the webpage structure and styling
     webpage_html = '''
@@ -301,17 +328,49 @@ def show_webpage():
         body {
             display: flex;
             flex-direction: column;
-            justify-content: center;  /* Vertically center the content */
+            justify-content: center;
             align-items: center;
-            min-height: 100vh;
+            min-height: 90vh;
+            padding: 0;
+            margin: 0;
             box-sizing: border-box;
+            /* background-color: #CCC; */
         }
         * {
             font-family: Arial, sans-serif;
+            z-index: 1;
         }
-        #buttons {
+        #editing, #solving {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        #editing {
             text-align: center;
-            padding-bottom: 20px;
+            display: none;
+        }
+        #error, #loading {
+            display: none;
+            background-color: #dc3546;
+            color: white;
+            padding: 10px 20px;
+            max-width: 300px;
+            margin: 0 auto;
+        }
+        #loading {
+            position: fixed;
+            top: 200px;
+            z-index: 3;
+            background-color: #007bfe;
+            border: 2px solid black;
+        }
+        #board, #buttons {
+            text-align: center;
+            padding-bottom: 10px;
+        }
+        #options {
+            padding-bottom: 10px;
         }
         button {
             padding: 6px 15px;
@@ -325,11 +384,6 @@ def show_webpage():
             background-color: white;
             cursor: auto;
         }
-        .sudoku-grid {
-            border-collapse: collapse;
-            border: 3px solid #000;
-            display: none;
-        }
         #state-0 {
             display: table;
         }
@@ -338,6 +392,61 @@ def show_webpage():
             text-align: center;
             padding: 6px 10px 6px 25px;
             border: 2px solid black;
+        }
+        #boards {
+            display: flex;
+            flex-wrap: wrap;
+            width: 1000px;
+            justify-content: center;
+            gap: 5px;
+            position: relative;
+        }
+        .board {
+            display: inline-block;
+            margin: 20px;
+            width: auto;
+        }
+        .board table {
+            border-collapse: collapse;
+            border: 3px solid #000;
+            background-color: white;
+            color: black;
+        }
+        #boards table:not(#board-5):not(#board-7):hover {
+            background-color: #ccc;
+            cursor: pointer;
+        }
+        .editable {
+            caret-color: transparent;
+        }
+        .board table td {
+            width: 2em;
+            height: 2em;
+            border: 1px solid #888;
+            text-align: center;
+            vertical-align: middle;
+            font-size: large;
+            line-height: 2em;
+        }
+        .board table.grid-9x9 tr:nth-child(3n) td {
+            border-bottom: 3px solid #000;
+        }
+        .board table.grid-9x9 td:nth-child(3n) {
+            border-right: 3px solid #000;
+        }
+        .board table.grid-4x4 tr:nth-child(2n) td {
+            border-bottom: 3px solid #000;
+        }
+        .board table.grid-4x4 td:nth-child(2n) {
+            border-right: 3px solid #000;
+        }
+        .sudoku-grid {
+            border-collapse: collapse;
+            border: 3px solid #000;
+            display: none;
+            background-color: white;
+            color: black;
+            margin-bottom: 30px;
         }
         .sudoku-grid td {
             width: 3em;
@@ -353,12 +462,47 @@ def show_webpage():
         .sudoku-grid td:nth-child({{box_size}}n) {
             border-right: 3px solid #000;
         }
+        .table-button {
+            margin-top: 5px;
+        }
     </style>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
     </head>
     <body>
     <h1>Sudoku Solver</h1>
-    <!--<a href="#solution">Go to Solution</a>-->''' + steps + '''
+    <div id="loading">Loading...</div>
+    <div id="editing">
+        <div id="error">Error: Custom board is unsolvable!</div>
+        <button id="back">Go Back</button>
+        <br /><br />
+        Choose a board:
+        <div id="boards">
+            {% for grid in boards %}
+                {% set size = grid|length %}
+                <div class="board">
+                    <table id="board-{{ loop.index0 }}" data-grid="{{ grid }}" class="grid-{{ size }}x{{ size }}">
+                        <tbody>
+                        {% for row in grid %}
+                            <tr>
+                            {% for value in row %}
+                                <td>
+                                {% if value != 0 %}
+                                    {{ value }}
+                                {% endif %}
+                                </td>
+                            {% endfor %}
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endfor %}
+
+        </div>
+    </div>
+    <div id="solving">
+    ''' + steps + '''
+    </div>
     <script>
     let state = 0;
     let previousState = state;
@@ -431,23 +575,128 @@ def show_webpage():
             $('#prev-state, #fast-bwd').prop("disabled", true);
         }
     });
+    $('#mistakes').change(() => {
+        if ($(this).is(':checked')) {
+            $('s, .comma').show();
+        } else {
+            $('s, .comma').hide();
+        }
+    });
+    $('#edit').on('click', () => {
+        $('#solving').hide();
+        $('#editing').show();
+    });
+    $('#boards table:not(#board-5):not(#board-7)').click(function() {
+        window.location.href = '/?board=' + $(this).attr('data-grid').replace(/%20|\s+/g, '');
+        $('#loading').show();
+    });
+    $('#back').on('click', () => {
+        $('#editing').hide();
+        $('#solving').show();
+    });
+    $(document).ready(function() {
+        if ({{num_states}} == 0) {
+            $('#error').show();
+            $('#solving, #back').hide();
+            $('#editing').show();
+        }
+        
+        $('#board-5 td, #board-7 td').prop('contenteditable', 'true');
+        $('#board-5 td, #board-7 td').addClass('editable');
+        $('#board-5').after('<button class="table-button" id="solve-9x9">Solve Custom 9x9</button>');
+        $('#board-7').after('<button class="table-button" id="solve-4x4">Solve Custom 4x4</button>');
+        
+        $('#solve-4x4, #solve-9x9').on('click', function() {
+            let resultArray = [];
 
+            let buttonId = $(this).attr('id');
+            let gridSize = buttonId.split('-')[1];
+            let boardID = (gridSize == '4x4') ? '7' : '5';
+            
+            $('#board-' + boardID + ' tr').each(function() {
+                let rowArray = [];
+                $(this).find('td').each(function() {
+                    let cellValue = $(this).text().trim();  // Get the cell text and trim any spaces
+                    if (cellValue === "") {
+                        rowArray.push(0);  // Push 0 for blank spaces
+                    } else {
+                        rowArray.push(parseInt(cellValue));  // Convert the text to an integer and push
+                    }
+                });
+                resultArray.push(rowArray);
+            });
+
+            let resultArrayString = JSON.stringify(resultArray);
+            window.location.href = '/?board=' + encodeURIComponent(resultArrayString);
+            $('#loading').show();
+        });
+    });
+    
+    function moveCaretToEnd(el) {
+        if (typeof window.getSelection != "undefined" && typeof document.createRange != "undefined") {
+            let range = document.createRange();
+            let sel = window.getSelection();
+            range.selectNodeContents(el);
+            range.collapse(false); // Move the caret to the end
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
+    }
+    $('#board-5 td, #board-7 td').on('focus click', function() {
+        moveCaretToEnd($(this)[0]);
+    });
+    $('#board-5 td, #board-7 td').on('keydown', function(e) {
+        // Prevent left arrow (keyCode 37) and right arrow (keyCode 39)
+        if (e.keyCode === 37 || e.keyCode === 39) {
+            e.preventDefault();  // Disable arrow key behavior
+            moveCaretToEnd($(this)[0]);  // Move caret to the end
+        }
+    });
+    $('#board-5 td, #board-7 td').on('input', function() {
+        let $this = $(this);
+        let tableNum = $this.closest('table').attr('id').slice(-1);
+        let maxValid = (tableNum == '5') ? '9' : '4';
+        let regex = new RegExp(`^[1-${maxValid}]$`);
+
+        setTimeout(function() {
+            let inputValue = $this.text().trim();  // Get the text and remove any extra spaces
+            
+            if (inputValue.length > 0) {  // Ensure there is at least one character before processing
+                let lastChar = inputValue.slice(-1);  // Get the last typed character
+                
+                // Only allow numbers between 1 and maxValid (either 1-9 or 1-4)
+                if (regex.test(lastChar)) {
+                    $this.text(lastChar);  // Keep only the last valid character
+                } else {
+                    $this.text('');  // Clear content if the input is invalid
+                }
+            }
+            moveCaretToEnd($this[0]);  // Ensure caret is always at the end
+        }, 0);  // Defer the execution so we can capture the final value
+    });
     </script>
     </body>
     </html>
     '''
-    return render_template_string(webpage_html, num_states=num_states, box_size=box_size, num_steps=len(progress))
+    return render_template_string(webpage_html, boards=puzzles, num_states=num_states, box_size=box_size, num_steps=len(progress))
 
 def show_steps(puzzle_data, progress, solution):
     """ Return the HTML for each progression in the solution steps. """
     # Show the initial board state
     solution_html = f'''
+        <div id="board">
+            <button id="edit">Edit Board</button>
+        </div>
         <div id="buttons">
             <button id="fast-bwd" disabled="disabled">Reset</button>
             <button id="prev-state" disabled="disabled"><</button> 
             <input id="step" type="number" min="0" value="0" />
             <button id="next-state">></button> 
             <button id="fast-fwd">Solve</button>
+        </div>
+        <div id="options">
+            <input type="checkbox" checked="checked" name="mistakes" id="mistakes" />
+            <label for="mistakes">Show Mistakes</label>
         </div>
         {sudoku_board(puzzle_data, 0)}
         '''
