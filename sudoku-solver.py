@@ -268,7 +268,7 @@ def show_webpage():
     query = request.args.get('board', '')
     if query.startswith("puzzle_"):
         puzzle = globals().get(query) or puzzle_1
-        print(f"Showing solution for {query if globals().get(query) else "puzzle_1"}.")
+        print(f"Showing solution for {query if globals().get(query) else 'puzzle_1'}.")
     else:
         try:
             puzzle = json.loads(query)
