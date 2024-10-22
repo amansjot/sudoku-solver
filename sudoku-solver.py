@@ -3,7 +3,6 @@ from flask import Flask, render_template_string, request
 from sudoku_constraints4x4 import constraints4x4
 from sudoku_constraints9x9 import constraints9x9
 import json
-import os
 
 app = Flask(__name__)
 
@@ -248,7 +247,7 @@ def show_webpage():
     query = request.args.get('board', '')
     if query.startswith("puzzle_"):
         puzzle = globals().get(query) or puzzle_1
-        print(f"Showing solution for {query if globals().get(query) else 'puzzle_1'}.")
+        print(f"Showing solution for {query if globals().get(query) else "puzzle_1"}.")
     else:
         try:
             puzzle = json.loads(query)
@@ -275,7 +274,7 @@ def show_webpage():
     print("Number of backtracks for each variable:", backtracks)
 
     # Set the color of the given values to black
-    cell_colors = [[(0, 0, 0) if cell else (100, 100, 100) for cell in row] for row in puzzle]
+    cell_colors = [[(0, 0, 0) if cell else (0, 0, 255) for cell in row] for row in puzzle]
 
     # Add the color data to each cell in the puzzle
     puzzle_data = [[[puzzle[i][j], cell_colors[i][j]] for j in range(size)] for i in range(size)]
@@ -287,6 +286,9 @@ def show_webpage():
     solution_data = [solution_vals[i * size:(i + 1) * size] for i in range(size)]
     colored_solution_data = [[[solution_data[i][j], cell_colors[i][j]] for j in range(size)] for i in range(size)]
 
+    # Display the steps and store the number of states
+    steps, num_states = show_steps(puzzle_data, progress, colored_solution_data)
+
     # HTML code for the webpage structure and styling
     webpage_html = '''
     <!DOCTYPE html>
@@ -296,12 +298,46 @@ def show_webpage():
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sudoku Grid</title>
     <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;  /* Vertically center the content */
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
         * {
             font-family: Arial, sans-serif;
+        }
+        #buttons {
+            text-align: center;
+            padding-bottom: 20px;
+        }
+        button {
+            padding: 6px 15px;
+            background-color: white;
+        }
+        button:hover {
+            background-color: lightgrey;
+            cursor: pointer;
+        }
+        button:disabled {
+            background-color: white;
+            cursor: auto;
         }
         .sudoku-grid {
             border-collapse: collapse;
             border: 3px solid #000;
+            display: none;
+        }
+        #state-0 {
+            display: table;
+        }
+        #step {
+            width: 45px;
+            text-align: center;
+            padding: 6px 10px 6px 25px;
+            border: 2px solid black;
         }
         .sudoku-grid td {
             width: 3em;
@@ -318,21 +354,102 @@ def show_webpage():
             border-right: 3px solid #000;
         }
     </style>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
     </head>
     <body>
     <h1>Sudoku Solver</h1>
-    <a href="#solution">Go to Solution</a>''' + show_steps(puzzle_data, progress, colored_solution_data) + '''
+    <!--<a href="#solution">Go to Solution</a>-->''' + steps + '''
+    <script>
+    let state = 0;
+    let previousState = state;
+    $('#step').prop('max', {{ num_states }});
+    $('#prev-state').on('click', () => {
+        if (state == 1) {
+            $('#prev-state, #fast-bwd').prop("disabled", true);
+        }
+        if (state > 0) {
+            $('#next-state, #fast-fwd').prop("disabled", false);
+            $('#state-' + state).hide();
+            state -= 1;
+            $('#step').val(state);
+            $('#state-' + state).show();
+            $('#state').text('State ' + state);
+        }
+    });
+    $('#next-state').on('click', () => {
+        if (state < {{ num_states }}) {
+            $('#prev-state, #fast-bwd').prop("disabled", false);
+            $('#state-' + state).hide();
+            state += 1;
+            $('#step').val(state);
+            $('#state-' + state).show();
+            $('#state').text('State ' + state);
+        }
+        if (state == {{ num_states }}) {
+            $('#next-state, #fast-fwd').prop("disabled", true);
+            $('#state').text('Solution');
+        }
+    });
+    $('#fast-bwd').on('click', () => {
+        let i = state;
+        let bwdInterval = setInterval(() => {
+            $('#prev-state').trigger('click');
+            i--;
+            if (i == 0) {
+                clearInterval(bwdInterval);
+            }
+        }, 70);
+    });
+    $('#fast-fwd').on('click', () => {
+        let i = state;
+        let fwdInterval = setInterval(() => {
+            $('#next-state').trigger('click');
+            i++;
+            if (i == {{ num_states }}) {
+                clearInterval(fwdInterval);
+            }
+        }, 70);
+    });
+    $('#step').on('change', () => {
+        let newState = parseInt($('#step').val());
+        if (!isNaN(newState) && newState >= 0 && newState <= {{ num_states }}) {
+            $('#prev-state, #fast-bwd, #next-state, #fast-fwd').prop("disabled", false);
+            $('#state-' + state).hide();
+            state = newState;
+            $('#step').val(state);
+            $('#state-' + state).show();
+            $('#state').text('State ' + state);
+            previousState = state;
+        } else {
+            $('#step').val(previousState);
+        }
+        
+        if (state == {{ num_states }}) {
+            $('#next-state, #fast-fwd').prop("disabled", true);
+        }
+        if (state == 0) {
+            $('#prev-state, #fast-bwd').prop("disabled", true);
+        }
+    });
+
+    </script>
     </body>
     </html>
     '''
-    return render_template_string(webpage_html, box_size=box_size)
+    return render_template_string(webpage_html, num_states=num_states, box_size=box_size, num_steps=len(progress))
 
 def show_steps(puzzle_data, progress, solution):
     """ Return the HTML for each progression in the solution steps. """
     # Show the initial board state
     solution_html = f'''
-        <h3>State 0\n</h3>
-        {sudoku_board(puzzle_data)}
+        <div id="buttons">
+            <button id="fast-bwd" disabled="disabled">Reset</button>
+            <button id="prev-state" disabled="disabled"><</button> 
+            <input id="step" type="number" min="0" value="0" />
+            <button id="next-state">></button> 
+            <button id="fast-fwd">Solve</button>
+        </div>
+        {sudoku_board(puzzle_data, 0)}
         '''
     
     # Color each number based on the solution progression
@@ -357,8 +474,8 @@ def show_steps(puzzle_data, progress, solution):
         if not puzzle_data[row][col][0]:
             puzzle_data[row][col][0] = value
             solution_html += f'''
-            <h3>State {state}\n</h3>
-            {sudoku_board(puzzle_data)}
+            <!--<h3>State {state} <button><</button> <button>></button>\n</h3>-->
+            {sudoku_board(puzzle_data, state)}
             '''
             state += 1
         else:
@@ -367,13 +484,13 @@ def show_steps(puzzle_data, progress, solution):
 
     # Show the solution state
     solution_html += f'''
-        <h3 id="solution">Solution\n</h3>
-        {sudoku_board(solution)}
+        <!--<h3 id="solution">Solution\n</h3>-->
+        {sudoku_board(solution, state)}
         '''
     
-    return solution_html
+    return solution_html, state
 
-def sudoku_board(puzzle_data):
+def sudoku_board(puzzle_data, state):
     """ Create the sudoku board in HTML based on the puzzle data. """
     # Determine the size of a box
     box_size = int(len(puzzle_data) ** 0.5)
@@ -386,7 +503,7 @@ def sudoku_board(puzzle_data):
 
     # HTML to create the sudoku board grid
     grid_html = '''
-    <table class="sudoku-grid">
+    <table class="sudoku-grid" id="state-{{ state }}">
         <tbody>
         {% for row in puzzle_data %}
             <tr>
@@ -395,7 +512,7 @@ def sudoku_board(puzzle_data):
                 <td style="color: {{ rgb_color }}; font-weight: {% if rgb_color == 'rgb(0, 0, 0)' %}bold{% else %}normal{% endif %};">
                     {% if value is string %}
                         {% set unique_guess_str = unique_guesses(value) %}
-                        {{ unique_guess_str[0] }}{% for digit in unique_guess_str[1:] %}, <s>{{ digit }}</s>{% endfor %}
+                        {{ unique_guess_str[0] }}{% for digit in unique_guess_str[1:] %}<span class="comma">,</span> <s>{{ digit }}</s>{% endfor %}
                     {% elif value %}
                         {{ value }}
                     {% endif %}
@@ -406,9 +523,8 @@ def sudoku_board(puzzle_data):
         </tbody>
     </table>
     '''
-    return render_template_string(grid_html, puzzle_data=puzzle_data, box_size=box_size, unique_guesses=unique_guesses)
+    return render_template_string(grid_html, puzzle_data=puzzle_data, box_size=box_size, unique_guesses=unique_guesses, state=state)
 
 # Run app on http://localhost:8080
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))  # Default to 5000 if PORT not found
-    app.run(debug=True, host="0.0.0.0", port=port)
+    app.run(debug=True, port=8080)
