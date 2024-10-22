@@ -575,7 +575,7 @@ def show_webpage():
             $('#prev-state, #fast-bwd').prop("disabled", true);
         }
     });
-    $('#mistakes').change(() => {
+    $('#mistakes').change(function() {
         if ($(this).is(':checked')) {
             $('s, .comma').show();
         } else {
